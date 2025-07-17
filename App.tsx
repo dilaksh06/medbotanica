@@ -1,12 +1,9 @@
-import React from 'react'
-import { Text, View } from 'react-native'
+// App.tsx
 
-const App = () => {
-  return (
-    <View style={{ backgroundColor: 'white', flex: 1 }}>
-      <Text style={{ textAlign: 'center' }}>MedBotanic</Text>
-    </View>
-  )
+import React from 'react';
+import 'react-native-gesture-handler'; // at very top of App.tsx
+import RootNavigator from './app/navigation/RootNavigator'; // ✅ Your main navigator
+
+export default function App() {
+  return <RootNavigator />;
 }
-
-export default App
