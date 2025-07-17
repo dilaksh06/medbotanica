@@ -10,16 +10,17 @@ import {
     View,
 } from 'react-native';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import theme from '../utils/theme'; // assuming theme is under utils
+import theme from '../utils/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-export default function LoginScreen({ navigation }: Props) {
+export default function RegisterScreen({ navigation }: Props) {
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const handleLogin = () => {
-        // TODO: Validate login here
+    const handleRegister = () => {
+        // TODO: Implement actual registration logic
         navigation.replace('MainTabs');
     };
 
@@ -30,8 +31,15 @@ export default function LoginScreen({ navigation }: Props) {
         >
             <View style={styles.inner}>
                 <Text style={styles.title}>🌿 MedBotanica</Text>
-                <Text style={styles.subtitle}>Identify Nature’s Healing</Text>
+                <Text style={styles.subtitle}>Create Your Healing Journey</Text>
 
+                <TextInput
+                    style={styles.input}
+                    placeholder="Full Name"
+                    placeholderTextColor="#888"
+                    value={name}
+                    onChangeText={setName}
+                />
                 <TextInput
                     style={styles.input}
                     placeholder="Email"
@@ -39,8 +47,8 @@ export default function LoginScreen({ navigation }: Props) {
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
+                    autoCapitalize="none"
                 />
-
                 <TextInput
                     style={styles.input}
                     placeholder="Password"
@@ -50,15 +58,15 @@ export default function LoginScreen({ navigation }: Props) {
                     onChangeText={setPassword}
                 />
 
-                <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                    <Text style={styles.buttonText}>Login</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                    <Text style={styles.register}>
-                        Don't have an account? <Text style={styles.registerLink}>Register</Text>
-                    </Text>
+                <TouchableOpacity style={styles.button} onPress={handleRegister}>
+                    <Text style={styles.buttonText}>Register</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Text style={styles.login}>
+                        Already have an account? <Text style={styles.loginLink}>Login</Text>
+                    </Text>
+                </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>
     );
@@ -102,6 +110,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: theme.radius.md,
         alignItems: 'center',
+        marginLeft: 8,
         marginTop: theme.spacing.sm,
         shadowColor: theme.colors.shadow,
         shadowOffset: { width: 0, height: 4 },
@@ -113,17 +122,16 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: theme.typography.fontSize.medium,
         fontWeight: '600',
+        textAlign: 'center'
     },
-    register: {
+    login: {
         marginTop: theme.spacing.md,
         textAlign: 'center',
         fontSize: theme.typography.fontSize.small,
         color: theme.colors.textSecondary,
     },
-
-    registerLink: {
+    loginLink: {
         color: theme.colors.primary,
         fontWeight: 'bold',
     },
-
 });

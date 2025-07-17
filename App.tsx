@@ -1,9 +1,14 @@
 // App.tsx
 
 import React from 'react';
-import 'react-native-gesture-handler'; // at very top of App.tsx
-import RootNavigator from './app/navigation/RootNavigator'; // ✅ Your main navigator
+import 'react-native-gesture-handler'; // ✅ MUST be at very top
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import RootNavigator from './app/navigation/RootNavigator';
 
 export default function App() {
-  return <RootNavigator />;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <RootNavigator />
+    </GestureHandlerRootView>
+  );
 }
