@@ -1,22 +1,55 @@
-import React from 'react';
-import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const ProfileScreen = () => {
+    const [avatar, setAvatar] = useState<string | null>(null);
+
     const user = {
         name: 'Dilakshan Kamalathasan',
         email: 'dilakshan@email.com',
         bio: 'Botany enthusiast 🌿 | AI + Nature 🌱 | Building MedBotanica.',
-        avatar: 'https://i.pravatar.cc/300', // You can replace this with a user-uploaded URL
+        avatar: require('../assets/profile.png'), // fallback image
+    };
+
+    const handleImagePick = () => {
+        // Choose between camera or gallery
+        const options = {
+            mediaType: 'photo',
+            maxWidth: 512,
+            maxHeight: 512,
+            quality: 0.8,
+        };
+
+        // Ask user choice
+        launchImageLibrary(options, response => {
+            if (response.assets && response.assets.length > 0) {
+                setAvatar(response.assets[0].uri || null);
+            }
+        });
     };
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <ScrollView contentContainerStyle={styles.container}>
-                {/* Profile Picture */}
+                {/* Avatar */}
                 <View style={styles.avatarContainer}>
-                    <Image source={{ uri: user.avatar }} style={styles.avatar} />
-                    <TouchableOpacity style={styles.editIcon}>
+                    <Image
+                        source={
+                            avatar ? { uri: avatar } : user.avatar
+                        }
+                        style={styles.avatar}
+                    />
+                    <TouchableOpacity style={styles.editIcon} onPress={handleImagePick}>
                         <Icon name="camera" size={20} color="#fff" />
                     </TouchableOpacity>
                 </View>
@@ -26,7 +59,7 @@ const ProfileScreen = () => {
                 <Text style={styles.email}>{user.email}</Text>
                 <Text style={styles.bio}>{user.bio}</Text>
 
-                {/* Action Buttons */}
+                {/* Buttons */}
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity style={styles.button}>
                         <Icon name="pencil-outline" size={18} color="#fff" />
@@ -35,7 +68,9 @@ const ProfileScreen = () => {
 
                     <TouchableOpacity style={[styles.button, styles.settingsButton]}>
                         <Icon name="settings-outline" size={18} color="#2E7D32" />
-                        <Text style={[styles.buttonText, { color: '#2E7D32' }]}>Settings</Text>
+                        <Text style={[styles.buttonText, { color: '#2E7D32' }]}>
+                            Settings
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
