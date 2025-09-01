@@ -7,12 +7,19 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import SplashScreen from '../screens/SplashScreen';
 import BottomTabNavigator from './BottomTabNavigator';
-
+import SettingsScreen from '../screens/SettingsScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
 export type RootStackParamList = {
     Splash: undefined;
     Login: undefined;
     Register: undefined;
     MainTabs: undefined;
+    Settings: undefined;
+    ChangePassword: undefined;
+    PrivacySecurity: undefined;
+    HelpSupport: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,6 +47,26 @@ export default function RootNavigator() {
                     <Stack.Screen
                         name="MainTabs"
                         component={BottomTabNavigator}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="Settings"
+                        component={SettingsScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="ChangePassword"
+                        component={ChangePasswordScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="PrivacySecurity"
+                        component={PrivacySecurityScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="HelpSupport"
+                        component={HelpSupportScreen}
                         options={{ headerShown: false }}
                     />
                 </Stack.Navigator>

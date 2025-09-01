@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Image,
     SafeAreaView,
@@ -9,27 +9,113 @@ import {
     View,
     StatusBar,
     Alert,
-    Dimensions
+    Dimensions,
+    ActivityIndicator,
+    RefreshControl
 } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
 
-const ProfileScreen = () => {
-    const [avatar, setAvatar] = useState<string | null>(null);
-    const [isEditing, setIsEditing] = useState(false);
+interface User {
+    id: string;
+    name: string;
+    email: string;
+    profile_url?: string;
+    role: string;
+    created_at: string;
+    bio?: string;
+    plants_identified?: number;
+    accuracy?: string;
+    level?: string;
+}
 
-    const user = {
-        name: 'Dilakshan Kamalathasan',
-        email: 'dilakshan@email.com',
-        bio: 'Botany enthusiast 🌿 | AI + Nature 🌱 | Building MedBotanica.',
-        avatar: require('../assets/profile.png'), // fallback image
-        joinedDate: 'March 2024',
-        plantsIdentified: 147,
-        accuracy: '94%',
-        level: 'Expert Botanist'
+interface ProfileScreenProps {
+    navigation: any;
+}
+
+const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
+    const [avatar, setAvatar] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [uploading, setUploading] = useState(false);
+
+    // Fetch user data from backend
+    const fetchUserData = async () => {
+        try {
+            // const token = await AsyncStorage.getItem('authToken');
+            // For demo purposes, using a placeholder
+            const token = 'demo-token';
+            
+            const response = await fetch(`${API_BASE_URL}/user/me`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                setUser(userData);
+            } else {
+                throw new Error('Failed to fetch user data');
+            }
+        } catch (error) {
+            console.error('Error fetching user data:', error);
+            Alert.alert('Error', 'Failed to load profile data');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchUserData();
+        }, [])
+    );
+
+    const uploadProfileImage = async (imageUri: string) => {
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('avatar', {
+                uri: imageUri,
+                type: 'image/jpeg',
+                name: 'profile.jpg',
+            });
+
+            // const token = await AsyncStorage.getItem('authToken');
+            const token = 'demo-token';
+
+            const response = await fetch(`${API_BASE_URL}/user/avatar`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+                body: formData,
+            });
+
+            if (response.ok) {
+                Alert.alert('Success', 'Profile picture updated successfully');
+                fetchUserData(); // Refresh user data
+            } else {
+                throw new Error('Failed to upload image');
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            Alert.alert('Error', 'Failed to upload profile picture');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleImagePick = () => {
@@ -61,7 +147,11 @@ const ProfileScreen = () => {
 
         launchCamera(options, response => {
             if (response.assets && response.assets.length > 0) {
-                setAvatar(response.assets[0].uri || null);
+                const imageUri = response.assets[0].uri;
+                setAvatar(imageUri || null);
+                if (imageUri) {
+                    uploadProfileImage(imageUri);
+                }
             }
         });
     };
@@ -76,31 +166,93 @@ const ProfileScreen = () => {
 
         launchImageLibrary(options, response => {
             if (response.assets && response.assets.length > 0) {
-                setAvatar(response.assets[0].uri || null);
+                const imageUri = response.assets[0].uri;
+                setAvatar(imageUri || null);
+                if (imageUri) {
+                    uploadProfileImage(imageUri);
+                }
             }
         });
     };
 
     const handleEditProfile = () => {
-        setIsEditing(!isEditing);
-        // Navigate to edit profile screen or show edit modal
+        navigation.navigate('Settings');
     };
 
     const handleSettings = () => {
-        // Navigate to settings screen
-        console.log('Navigate to settings');
+        navigation.navigate('Settings');
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         Alert.alert(
             'Logout',
             'Are you sure you want to logout?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Logout', style: 'destructive', onPress: () => console.log('Logout') }
+                { 
+                    text: 'Logout', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                        // await AsyncStorage.removeItem('authToken');
+                        // await AsyncStorage.removeItem('userData');
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Login' }],
+                        });
+                    }
+                }
             ]
         );
     };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long' 
+        });
+    };
+
+    const StatCard = ({ icon, value, label, color }: {
+        icon: string;
+        value: string | number;
+        label: string;
+        color: string;
+    }) => (
+        <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
+                <Icon name={icon} size={20} color={color} />
+            </View>
+            <Text style={styles.statValue}>{value}</Text>
+            <Text style={styles.statLabel}>{label}</Text>
+        </View>
+    );
+
+    const QuickActionItem = ({ icon, label, onPress }: {
+        icon: string;
+        label: string;
+        onPress: () => void;
+    }) => (
+        <TouchableOpacity 
+            style={styles.quickActionItem} 
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            <View style={styles.quickActionIcon}>
+                <Icon name={icon} size={24} color="#1B4332" />
+            </View>
+            <Text style={styles.quickActionLabel}>{label}</Text>
+        </TouchableOpacity>
+    );
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#27AE60" />
+                <Text style={styles.loadingText}>Loading profile...</Text>
+            </View>
+        );
+    }
 
     return (
         <>
@@ -110,6 +262,14 @@ const ProfileScreen = () => {
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={fetchUserData}
+                            colors={['#27AE60']}
+                            tintColor="#27AE60"
+                        />
+                    }
                 >
                     {/* Header with Gradient */}
                     <LinearGradient
@@ -120,14 +280,27 @@ const ProfileScreen = () => {
                             {/* Avatar Section */}
                             <View style={styles.avatarSection}>
                                 <View style={styles.avatarContainer}>
-                                    <Image
-                                        source={avatar ? { uri: avatar } : user.avatar}
-                                        style={styles.avatar}
-                                    />
+                                    {uploading ? (
+                                        <View style={[styles.avatar, styles.avatarLoading]}>
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        </View>
+                                    ) : (
+                                        <Image
+                                            source={
+                                                avatar 
+                                                    ? { uri: avatar } 
+                                                    : user?.profile_url 
+                                                        ? { uri: user.profile_url }
+                                                        : require('../assets/profile.png')
+                                            }
+                                            style={styles.avatar}
+                                        />
+                                    )}
                                     <TouchableOpacity 
                                         style={styles.editAvatarButton} 
                                         onPress={handleImagePick}
                                         activeOpacity={0.8}
+                                        disabled={uploading}
                                     >
                                         <Icon name="camera" size={18} color="#fff" />
                                     </TouchableOpacity>
@@ -135,11 +308,13 @@ const ProfileScreen = () => {
 
                                 {/* User Info */}
                                 <View style={styles.userInfo}>
-                                    <Text style={styles.userName}>{user.name}</Text>
-                                    <Text style={styles.userEmail}>{user.email}</Text>
+                                    <Text style={styles.userName}>{user?.name || 'User'}</Text>
+                                    <Text style={styles.userEmail}>{user?.email || ''}</Text>
                                     <View style={styles.levelBadge}>
                                         <Icon name="leaf" size={14} color="#27AE60" />
-                                        <Text style={styles.levelText}>{user.level}</Text>
+                                        <Text style={styles.levelText}>
+                                            {user?.level || 'Plant Explorer'}
+                                        </Text>
                                     </View>
                                 </View>
                             </View>
@@ -151,19 +326,19 @@ const ProfileScreen = () => {
                         <View style={styles.statsContainer}>
                             <StatCard 
                                 icon="leaf-outline"
-                                value={user.plantsIdentified}
+                                value={user?.plants_identified || 0}
                                 label="Plants Identified"
                                 color="#27AE60"
                             />
                             <StatCard 
                                 icon="checkmark-circle-outline"
-                                value={user.accuracy}
+                                value={user?.accuracy || '0%'}
                                 label="Accuracy Rate"
                                 color="#2ECC71"
                             />
                             <StatCard 
                                 icon="calendar-outline"
-                                value={user.joinedDate}
+                                value={user?.created_at ? formatDate(user.created_at) : 'N/A'}
                                 label="Member Since"
                                 color="#52B788"
                             />
@@ -171,12 +346,16 @@ const ProfileScreen = () => {
                     </View>
 
                     {/* Bio Section */}
-                    <View style={styles.bioSection}>
-                        <View style={styles.sectionCard}>
-                            <Text style={styles.sectionTitle}>About</Text>
-                            <Text style={styles.bioText}>{user.bio}</Text>
+                    {user?.bio && (
+                        <View style={styles.bioSection}>
+                            <View style={styles.sectionCard}>
+                                <Text style={styles.sectionTitle}>About</Text>
+                                <Text style={styles.bioText}>
+                                    {user.bio || 'No bio available'}
+                                </Text>
+                            </View>
                         </View>
-                    </View>
+                    )}
 
                     {/* Action Buttons */}
                     <View style={styles.actionsSection}>
@@ -191,7 +370,7 @@ const ProfileScreen = () => {
                             >
                                 <Icon name="pencil-outline" size={18} color="#fff" />
                                 <Text style={styles.primaryButtonText}>
-                                    {isEditing ? 'Save Changes' : 'Edit Profile'}
+                                    Edit Profile
                                 </Text>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -224,22 +403,22 @@ const ProfileScreen = () => {
                             <QuickActionItem 
                                 icon="library-outline"
                                 label="My Collection"
-                                onPress={() => console.log('My Collection')}
+                                onPress={() => navigation.navigate('Collection')}
                             />
                             <QuickActionItem 
                                 icon="heart-outline"
                                 label="Favorites"
-                                onPress={() => console.log('Favorites')}
+                                onPress={() => navigation.navigate('Favorites')}
                             />
                             <QuickActionItem 
                                 icon="download-outline"
                                 label="Offline Data"
-                                onPress={() => console.log('Offline Data')}
+                                onPress={() => navigation.navigate('Offline')}
                             />
                             <QuickActionItem 
                                 icon="help-circle-outline"
                                 label="Help & FAQ"
-                                onPress={() => console.log('Help')}
+                                onPress={() => navigation.navigate('Help')}
                             />
                         </View>
                     </View>
@@ -260,38 +439,6 @@ const ProfileScreen = () => {
         </>
     );
 };
-
-const StatCard = ({ icon, value, label, color }: {
-    icon: string;
-    value: string | number;
-    label: string;
-    color: string;
-}) => (
-    <View style={styles.statCard}>
-        <View style={[styles.statIconContainer, { backgroundColor: color + '15' }]}>
-            <Icon name={icon} size={20} color={color} />
-        </View>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
-    </View>
-);
-
-const QuickActionItem = ({ icon, label, onPress }: {
-    icon: string;
-    label: string;
-    onPress: () => void;
-}) => (
-    <TouchableOpacity 
-        style={styles.quickActionItem} 
-        onPress={onPress}
-        activeOpacity={0.7}
-    >
-        <View style={styles.quickActionIcon}>
-            <Icon name={icon} size={24} color="#1B4332" />
-        </View>
-        <Text style={styles.quickActionLabel}>{label}</Text>
-    </TouchableOpacity>
-);
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -326,6 +473,11 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         borderWidth: 4,
         borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    avatarLoading: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#95A5A6',
     },
     editAvatarButton: {
         position: 'absolute',
@@ -561,6 +713,17 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         color: '#E74C3C',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F8FDF9',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#52796F',
     },
 });
 
