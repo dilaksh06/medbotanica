@@ -13,16 +13,38 @@ import {
     Dimensions,
     Alert,
     TouchableWithoutFeedback,
-    Keyboard
+    Keyboard,
+    ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import theme from '../utils/theme';
+import { API_BASE_URL } from '../config/api';
+// import AsyncStorage from '@react-native-async-storage/async-storage'; // Uncomment when using AsyncStorage
 
 const { width, height } = Dimensions.get('window');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+interface LoginResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        user: {
+            id: string;
+            name: string;
+            email: string;
+        };
+        token: string;
+    };
+}
+
+interface ValidationErrors {
+    email?: string;
+    password?: string;
+    general?: string;
+}
 
 export default function LoginScreen({ navigation }: Props) {
     const [email, setEmail] = useState('');
@@ -31,46 +53,214 @@ export default function LoginScreen({ navigation }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [emailFocused, setEmailFocused] = useState(false);
     const [passwordFocused, setPasswordFocused] = useState(false);
+    const [errors, setErrors] = useState<ValidationErrors>({});
 
     // Create refs for inputs
     const emailRef = useRef<TextInput>(null);
     const passwordRef = useRef<TextInput>(null);
 
-    const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
-            return;
-        }
-
-        if (!validateEmail(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
-            return;
-        }
-
-        setIsLoading(true);
-        
-        // Simulate API call
-        setTimeout(() => {
-            setIsLoading(false);
-            // TODO: Replace with actual login validation
-            navigation.replace('MainTabs');
-        }, 1500);
-    };
-
-    const validateEmail = (email: string) => {
+    const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     };
 
-    const handleForgotPassword = () => {
+    const validateForm = (): boolean => {
+        const newErrors: ValidationErrors = {};
+
+        if (!email.trim()) {
+            newErrors.email = 'Email address is required';
+        } else if (!validateEmail(email)) {
+            newErrors.email = 'Please enter a valid email address';
+        }
+
+        if (!password) {
+            newErrors.password = 'Password is required';
+        } else if (password.length < 6) {
+            newErrors.password = 'Password must be at least 6 characters';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleLogin = async () => {
+        // Clear previous errors
+        setErrors({});
+        
+        if (!validateForm()) {
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // Construct the full URL for the login endpoint
+            const url = `${API_BASE_URL}/auth/login`;
+            console.log("Attempting to log in to:", url);
+
+            // Make the API call to the backend
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    email: email.trim().toLowerCase(), 
+                    password: password 
+                }),
+            });
+
+            const responseData: LoginResponse = await response.json();
+
+            if (!response.ok) {
+                // Handle different error scenarios
+                if (response.status === 400) {
+                    // Validation errors from backend
+                    if (responseData.message.includes('email')) {
+                        setErrors({ email: responseData.message });
+                    } else if (responseData.message.includes('password')) {
+                        setErrors({ password: responseData.message });
+                    } else {
+                        setErrors({ general: responseData.message });
+                    }
+                } else if (response.status === 401) {
+                    // Unauthorized - wrong credentials
+                    setErrors({ general: 'Invalid email or password. Please try again.' });
+                } else if (response.status === 404) {
+                    // User not found
+                    setErrors({ email: 'No account found with this email address' });
+                } else if (response.status === 429) {
+                    // Rate limiting
+                    setErrors({ general: 'Too many login attempts. Please try again later.' });
+                } else {
+                    // Generic error
+                    setErrors({ general: responseData.message || 'Login failed. Please try again.' });
+                }
+            } else {
+                // Login was successful
+                console.log("Login successful:", responseData);
+                
+                // Store authentication token
+                if (responseData.data?.token) {
+                    // TODO: Uncomment and use AsyncStorage to store the token
+                    // await AsyncStorage.setItem('authToken', responseData.data.token);
+                    // await AsyncStorage.setItem('userData', JSON.stringify(responseData.data.user));
+                    console.log('Token stored:', responseData.data.token);
+                }
+
+                // Show success message
+                Alert.alert(
+                    'Welcome Back!',
+                    `Hello ${responseData.data?.user?.name || 'there'}! Ready to explore nature's pharmacy?`,
+                    [
+                        { 
+                            text: 'Continue', 
+                            onPress: () => navigation.replace('MainTabs') 
+                        }
+                    ]
+                );
+            }
+        } catch (error) {
+            // Handle network or other unexpected errors
+            console.error('Login failed:', error);
+            
+            if (error instanceof TypeError && error.message.includes('Network request failed')) {
+                setErrors({ general: 'Network request failed. Check your connection and try again.' });
+            } else if (error instanceof Error && error.message.includes('timeout')) {
+                setErrors({ general: 'Request timed out. Please try again.' });
+            } else {
+                setErrors({ general: 'An unexpected error occurred. Please try again.' });
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!email.trim()) {
+            Alert.alert(
+                'Email Required',
+                'Please enter your email address first, then try again.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            Alert.alert(
+                'Invalid Email',
+                'Please enter a valid email address.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
         Alert.alert(
             'Reset Password',
-            'Password reset link will be sent to your email address.',
+            `A password reset link will be sent to ${email}`,
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Send Link', onPress: () => console.log('Reset password') }
+                { 
+                    text: 'Send Link', 
+                    onPress: async () => {
+                        try {
+                            // TODO: Implement actual forgot password API call
+                            const url = `${API_BASE_URL}/auth/forgot-password`;
+                            const response = await fetch(url, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ email: email.trim().toLowerCase() }),
+                            });
+
+                            if (response.ok) {
+                                Alert.alert(
+                                    'Email Sent',
+                                    'Check your inbox for password reset instructions.',
+                                    [{ text: 'OK' }]
+                                );
+                            } else {
+                                throw new Error('Failed to send reset email');
+                            }
+                        } catch (error) {
+                            console.log('Forgot password (placeholder):', email);
+                            // For now, show success message as placeholder
+                            Alert.alert(
+                                'Reset Link Sent',
+                                'Check your email for password reset instructions.',
+                                [{ text: 'OK' }]
+                            );
+                        }
+                    }
+                }
             ]
         );
+    };
+
+    const handleSocialLogin = async (provider: 'Google' | 'Apple') => {
+        try {
+            // TODO: Implement actual social authentication
+            console.log(`Login with ${provider}`);
+            
+            // For now, show a placeholder alert
+            Alert.alert(
+                `${provider} Login`,
+                `${provider} login will be implemented soon.`,
+                [{ text: 'OK' }]
+            );
+            
+            // Example implementation structure:
+            // 1. Use appropriate social auth library (Google Sign-In, Apple Sign-In)
+            // 2. Get social auth token
+            // 3. Send token to your backend for verification
+            // 4. Backend verifies token and returns app token
+            // 5. Store token and navigate to main app
+            
+        } catch (error) {
+            console.error(`${provider} login failed:`, error);
+            Alert.alert('Authentication Error', `Failed to authenticate with ${provider}. Please try again.`);
+        }
     };
 
     const focusNextInput = () => {
@@ -79,16 +269,25 @@ export default function LoginScreen({ navigation }: Props) {
         }
     };
 
+    const dismissKeyboard = () => {
+        Keyboard.dismiss();
+    };
+
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            enabled={true}
+        >
             <StatusBar barStyle="light-content" backgroundColor="#1B4332" />
-            
-            <ScrollView 
+
+            <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="always"
                 nestedScrollEnabled={true}
+                bounces={true}
             >
                 {/* Header Section with Gradient */}
                 <LinearGradient
@@ -115,19 +314,27 @@ export default function LoginScreen({ navigation }: Props) {
                             Sign in to continue your botanical journey
                         </Text>
 
+                        {/* Display general error message if it exists */}
+                        {errors.general && (
+                            <View style={styles.generalErrorContainer}>
+                                <Icon name="alert-circle-outline" size={16} color={theme.colors.error} />
+                                <Text style={styles.generalErrorText}>{errors.general}</Text>
+                            </View>
+                        )}
+
                         {/* Email Input */}
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Email Address</Text>
                             <TouchableWithoutFeedback onPress={() => emailRef.current?.focus()}>
                                 <View style={[
-                                    styles.inputWrapper, 
+                                    styles.inputWrapper,
                                     emailFocused && styles.inputFocused,
-                                    email && !validateEmail(email) && styles.inputError
+                                    errors.email && styles.inputError
                                 ]}>
-                                    <Icon 
-                                        name="mail-outline" 
-                                        size={20} 
-                                        color={emailFocused ? theme.colors.primary : theme.colors.textTertiary} 
+                                    <Icon
+                                        name="mail-outline"
+                                        size={20}
+                                        color={emailFocused ? theme.colors.primary : theme.colors.textTertiary}
                                         style={styles.inputIcon}
                                     />
                                     <TextInput
@@ -136,7 +343,12 @@ export default function LoginScreen({ navigation }: Props) {
                                         placeholder="Enter your email"
                                         placeholderTextColor={theme.colors.textTertiary}
                                         value={email}
-                                        onChangeText={setEmail}
+                                        onChangeText={(text) => {
+                                            setEmail(text);
+                                            if (errors.email) {
+                                                setErrors(prev => ({ ...prev, email: undefined }));
+                                            }
+                                        }}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -146,9 +358,12 @@ export default function LoginScreen({ navigation }: Props) {
                                         onBlur={() => setEmailFocused(false)}
                                         onSubmitEditing={focusNextInput}
                                         enablesReturnKeyAutomatically={true}
+                                        maxLength={100}
+                                        editable={!isLoading}
                                     />
                                 </View>
                             </TouchableWithoutFeedback>
+                            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
                         </View>
 
                         {/* Password Input */}
@@ -156,13 +371,14 @@ export default function LoginScreen({ navigation }: Props) {
                             <Text style={styles.inputLabel}>Password</Text>
                             <TouchableWithoutFeedback onPress={() => passwordRef.current?.focus()}>
                                 <View style={[
-                                    styles.inputWrapper, 
-                                    passwordFocused && styles.inputFocused
+                                    styles.inputWrapper,
+                                    passwordFocused && styles.inputFocused,
+                                    errors.password && styles.inputError
                                 ]}>
-                                    <Icon 
-                                        name="lock-closed-outline" 
-                                        size={20} 
-                                        color={passwordFocused ? theme.colors.primary : theme.colors.textTertiary} 
+                                    <Icon
+                                        name="lock-closed-outline"
+                                        size={20}
+                                        color={passwordFocused ? theme.colors.primary : theme.colors.textTertiary}
                                         style={styles.inputIcon}
                                     />
                                     <TextInput
@@ -172,43 +388,58 @@ export default function LoginScreen({ navigation }: Props) {
                                         placeholderTextColor={theme.colors.textTertiary}
                                         secureTextEntry={!showPassword}
                                         value={password}
-                                        onChangeText={setPassword}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            if (errors.password) {
+                                                setErrors(prev => ({ ...prev, password: undefined }));
+                                            }
+                                        }}
                                         textContentType="password"
                                         returnKeyType="done"
                                         onFocus={() => setPasswordFocused(true)}
                                         onBlur={() => setPasswordFocused(false)}
                                         onSubmitEditing={handleLogin}
                                         enablesReturnKeyAutomatically={true}
+                                        maxLength={128}
+                                        editable={!isLoading}
                                     />
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={() => setShowPassword(!showPassword)}
                                         style={styles.eyeButton}
                                         activeOpacity={0.7}
                                         hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                                        disabled={isLoading}
                                     >
-                                        <Icon 
-                                            name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                                            size={20} 
+                                        <Icon
+                                            name={showPassword ? "eye-outline" : "eye-off-outline"}
+                                            size={20}
                                             color={theme.colors.textTertiary}
                                         />
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
+                            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
                         </View>
 
                         {/* Forgot Password */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.forgotPasswordButton}
                             onPress={handleForgotPassword}
                             activeOpacity={0.7}
                             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                            disabled={isLoading}
                         >
-                            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                            <Text style={[
+                                styles.forgotPasswordText,
+                                isLoading && styles.linkDisabled
+                            ]}>
+                                Forgot Password?
+                            </Text>
                         </TouchableOpacity>
 
                         {/* Login Button */}
-                        <TouchableOpacity 
-                            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+                        <TouchableOpacity
+                            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
                             onPress={handleLogin}
                             disabled={isLoading}
                             activeOpacity={0.8}
@@ -218,9 +449,10 @@ export default function LoginScreen({ navigation }: Props) {
                                 style={styles.loginButtonGradient}
                             >
                                 {isLoading ? (
-                                    <>
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="small" color="#fff" />
                                         <Text style={styles.loadingText}>Signing In...</Text>
-                                    </>
+                                    </View>
                                 ) : (
                                     <>
                                         <Icon name="log-in-outline" size={20} color="#fff" />
@@ -239,12 +471,22 @@ export default function LoginScreen({ navigation }: Props) {
 
                         {/* Social Login Options */}
                         <View style={styles.socialButtonsContainer}>
-                            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                            <TouchableOpacity 
+                                style={[styles.socialButton, isLoading && styles.socialButtonDisabled]} 
+                                onPress={() => handleSocialLogin('Google')}
+                                activeOpacity={0.7}
+                                disabled={isLoading}
+                            >
                                 <Icon name="logo-google" size={20} color="#DB4437" />
                                 <Text style={styles.socialButtonText}>Google</Text>
                             </TouchableOpacity>
-                            
-                            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+
+                            <TouchableOpacity 
+                                style={[styles.socialButton, isLoading && styles.socialButtonDisabled]} 
+                                onPress={() => handleSocialLogin('Apple')}
+                                activeOpacity={0.7}
+                                disabled={isLoading}
+                            >
                                 <Icon name="logo-apple" size={20} color="#000" />
                                 <Text style={styles.socialButtonText}>Apple</Text>
                             </TouchableOpacity>
@@ -254,16 +496,22 @@ export default function LoginScreen({ navigation }: Props) {
                     {/* Register Link */}
                     <View style={styles.registerContainer}>
                         <Text style={styles.registerText}>Don't have an account? </Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={() => navigation.navigate('Register')}
                             activeOpacity={0.7}
+                            disabled={isLoading}
                         >
-                            <Text style={styles.registerLink}>Create Account</Text>
+                            <Text style={[
+                                styles.registerLink,
+                                isLoading && styles.linkDisabled
+                            ]}>
+                                Create Account
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -277,10 +525,10 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        paddingBottom: Platform.OS === 'ios' ? 50 : 100,
+        paddingBottom: Platform.OS === 'ios' ? 30 : 50,
     },
     headerGradient: {
-        paddingTop: 50,
+        paddingTop: Platform.OS === 'ios' ? 60 : 50,
         paddingBottom: 40,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
@@ -349,6 +597,22 @@ const styles = StyleSheet.create({
         marginBottom: 30,
         lineHeight: 22,
     },
+    generalErrorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF5F5',
+        borderWidth: 1,
+        borderColor: theme.colors.error,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 20,
+    },
+    generalErrorText: {
+        color: theme.colors.error,
+        fontSize: 14,
+        marginLeft: 8,
+        flex: 1,
+    },
     inputContainer: {
         marginBottom: 20,
     },
@@ -400,6 +664,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    errorText: {
+        fontSize: 12,
+        color: theme.colors.error,
+        marginTop: 4,
+        marginLeft: 4,
+    },
     forgotPasswordButton: {
         alignSelf: 'flex-end',
         marginBottom: 24,
@@ -409,6 +679,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: theme.colors.primary,
         fontWeight: '500',
+    },
+    linkDisabled: {
+        opacity: 0.5,
     },
     loginButton: {
         borderRadius: 16,
@@ -423,6 +696,7 @@ const styles = StyleSheet.create({
     loginButtonDisabled: {
         shadowOpacity: 0.1,
         elevation: 2,
+        opacity: 0.7,
     },
     loginButtonGradient: {
         flexDirection: 'row',
@@ -431,11 +705,17 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         paddingHorizontal: 24,
         gap: 8,
+        minHeight: 52,
     },
     loginButtonText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     loadingText: {
         fontSize: 16,
@@ -473,6 +753,10 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 16,
         gap: 8,
+        minHeight: 44,
+    },
+    socialButtonDisabled: {
+        opacity: 0.5,
     },
     socialButtonText: {
         fontSize: 14,
@@ -485,6 +769,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 24,
         marginBottom: 40,
+        paddingHorizontal: 20,
     },
     registerText: {
         fontSize: 14,

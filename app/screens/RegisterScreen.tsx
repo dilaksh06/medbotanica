@@ -11,12 +11,16 @@ import {
     StatusBar,
     Dimensions,
     Alert,
-    TouchableWithoutFeedback
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import theme from '../utils/theme';
+import { API_BASE_URL } from '../config/api';
+ import AsyncStorage from '@react-native-async-storage/async-storage'; // Uncomment when using AsyncStorage
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +31,20 @@ interface ValidationErrors {
     email?: string;
     password?: string;
     confirmPassword?: string;
+    general?: string;
+}
+
+interface ApiResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        user: {
+            id: string;
+            name: string;
+            email: string;
+        };
+        token: string;
+    };
 }
 
 export default function RegisterScreen({ navigation }: Props) {
@@ -108,6 +126,9 @@ export default function RegisterScreen({ navigation }: Props) {
     };
 
     const handleRegister = async () => {
+        // Clear previous errors
+        setErrors({});
+        
         if (!validateForm()) {
             return;
         }
@@ -118,23 +139,127 @@ export default function RegisterScreen({ navigation }: Props) {
         }
 
         setIsLoading(true);
-        
-        // Simulate API call
-        setTimeout(() => {
+
+        try {
+            // Construct the full URL for the registration endpoint
+            const url = `${API_BASE_URL}/auth/register`;
+            console.log("Attempting to register to:", url);
+
+            // Make the API call to the backend
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name.trim(),
+                    email: email.trim().toLowerCase(),
+                    password: password,
+                }),
+            });
+
+            const responseData: ApiResponse = await response.json();
+
+            if (!response.ok) {
+                // Handle different error scenarios
+                if (response.status === 400) {
+                    // Validation errors from backend
+                    if (responseData.message.includes('email')) {
+                        setErrors({ email: responseData.message });
+                    } else if (responseData.message.includes('password')) {
+                        setErrors({ password: responseData.message });
+                    } else if (responseData.message.includes('name')) {
+                        setErrors({ name: responseData.message });
+                    } else {
+                        setErrors({ general: responseData.message });
+                    }
+                } else if (response.status === 409) {
+                    // Email already exists
+                    setErrors({ email: 'An account with this email already exists' });
+                } else {
+                    // Generic error
+                    setErrors({ general: responseData.message || 'Registration failed. Please try again.' });
+                }
+            } else {
+                // Registration was successful
+                console.log("Registration successful:", responseData);
+                
+                // Store authentication token
+                if (responseData.data?.token) {
+                    // TODO: Uncomment and use AsyncStorage to store the token
+                    // await AsyncStorage.setItem('authToken', responseData.data.token);
+                    // await AsyncStorage.setItem('userData', JSON.stringify(responseData.data.user));
+                    console.log('Token stored:', responseData.data.token);
+                }
+
+                Alert.alert(
+                    'Registration Successful!',
+                    `Welcome to MedBotanica, ${responseData.data?.user?.name || name}! Your botanical journey begins now.`,
+                    [
+                        { 
+                            text: 'Get Started', 
+                            onPress: () => navigation.replace('MainTabs') 
+                        }
+                    ]
+                );
+            }
+        } catch (error) {
+            // Handle network or other unexpected errors
+            console.error('Registration failed:', error);
+            
+            if (error instanceof TypeError && error.message.includes('Network request failed')) {
+                setErrors({ general: 'Network request failed. Check your connection and try again.' });
+            } else if (error instanceof Error && error.message.includes('timeout')) {
+                setErrors({ general: 'Request timed out. Please try again.' });
+            } else {
+                setErrors({ general: 'An unexpected error occurred. Please try again.' });
+            }
+        } finally {
             setIsLoading(false);
-            // TODO: Replace with actual registration logic
-            Alert.alert(
-                'Registration Successful!',
-                'Welcome to MedBotanica! Your botanical journey begins now.',
-                [
-                    { text: 'Get Started', onPress: () => navigation.replace('MainTabs') }
-                ]
-            );
-        }, 2000);
+        }
     };
 
-    const handleSocialRegister = (provider: string) => {
-        console.log(`Register with ${provider}`);
+    const handleSocialRegister = async (provider: 'Google' | 'Apple') => {
+        try {
+            // TODO: Implement actual social authentication
+            console.log(`Register with ${provider}`);
+            
+            // For now, show a placeholder alert
+            Alert.alert(
+                `${provider} Registration`,
+                `${provider} registration will be implemented soon.`,
+                [{ text: 'OK' }]
+            );
+            
+            // Example implementation structure:
+            // 1. Use appropriate social auth library (Google Sign-In, Apple Sign-In)
+            // 2. Get social auth token
+            // 3. Send token to your backend for verification
+            // 4. Backend creates user account and returns app token
+            // 5. Store token and navigate to main app
+            
+        } catch (error) {
+            console.error(`${provider} registration failed:`, error);
+            Alert.alert('Authentication Error', `Failed to authenticate with ${provider}. Please try again.`);
+        }
+    };
+
+    const handleTermsPress = () => {
+        // TODO: Navigate to Terms & Conditions screen or open web view
+        Alert.alert(
+            'Terms & Conditions',
+            'Terms & Conditions and Privacy Policy screens will be implemented.',
+            [{ text: 'OK' }]
+        );
+    };
+
+    const handlePrivacyPress = () => {
+        // TODO: Navigate to Privacy Policy screen or open web view
+        Alert.alert(
+            'Privacy Policy',
+            'Privacy Policy screen will be implemented.',
+            [{ text: 'OK' }]
+        );
     };
 
     // Navigation between inputs
@@ -145,7 +270,11 @@ export default function RegisterScreen({ navigation }: Props) {
     const passwordStrength = getPasswordStrength(password);
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            enabled={true}
+        >
             <StatusBar barStyle="light-content" backgroundColor="#1B4332" />
             
             <ScrollView 
@@ -154,6 +283,7 @@ export default function RegisterScreen({ navigation }: Props) {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="always"
                 nestedScrollEnabled={true}
+                bounces={true}
             >
                 {/* Header Section with Gradient */}
                 <LinearGradient
@@ -164,7 +294,8 @@ export default function RegisterScreen({ navigation }: Props) {
                         <TouchableOpacity 
                             style={styles.backButton}
                             onPress={() => navigation.goBack()}
-                            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                            hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+                            activeOpacity={0.7}
                         >
                             <Icon name="arrow-back" size={24} color="#fff" />
                         </TouchableOpacity>
@@ -187,6 +318,14 @@ export default function RegisterScreen({ navigation }: Props) {
                         <Text style={styles.registerSubtext}>
                             Start your botanical adventure today
                         </Text>
+
+                        {/* Display general error message if it exists */}
+                        {errors.general && (
+                            <View style={styles.generalErrorContainer}>
+                                <Icon name="alert-circle-outline" size={16} color={theme.colors.error} />
+                                <Text style={styles.generalErrorText}>{errors.general}</Text>
+                            </View>
+                        )}
 
                         {/* Full Name Input */}
                         <View style={styles.inputContainer}>
@@ -221,6 +360,8 @@ export default function RegisterScreen({ navigation }: Props) {
                                         onBlur={() => setFocusedField(null)}
                                         onSubmitEditing={focusEmail}
                                         enablesReturnKeyAutomatically={true}
+                                        textContentType="name"
+                                        maxLength={50}
                                     />
                                 </View>
                             </TouchableWithoutFeedback>
@@ -263,6 +404,7 @@ export default function RegisterScreen({ navigation }: Props) {
                                         onBlur={() => setFocusedField(null)}
                                         onSubmitEditing={focusPassword}
                                         enablesReturnKeyAutomatically={true}
+                                        maxLength={100}
                                     />
                                 </View>
                             </TouchableWithoutFeedback>
@@ -303,6 +445,7 @@ export default function RegisterScreen({ navigation }: Props) {
                                         onBlur={() => setFocusedField(null)}
                                         onSubmitEditing={focusConfirmPassword}
                                         enablesReturnKeyAutomatically={true}
+                                        maxLength={128}
                                     />
                                     <TouchableOpacity 
                                         onPress={() => setShowPassword(!showPassword)}
@@ -376,6 +519,7 @@ export default function RegisterScreen({ navigation }: Props) {
                                         onBlur={() => setFocusedField(null)}
                                         onSubmitEditing={handleRegister}
                                         enablesReturnKeyAutomatically={true}
+                                        maxLength={128}
                                     />
                                     <TouchableOpacity 
                                         onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -406,28 +550,41 @@ export default function RegisterScreen({ navigation }: Props) {
                             <View style={styles.checkboxTextContainer}>
                                 <Text style={styles.checkboxText}>
                                     I agree to the{' '}
-                                    <Text style={styles.linkText}>Terms & Conditions</Text>
+                                    <Text style={styles.linkText} onPress={handleTermsPress}>
+                                        Terms & Conditions
+                                    </Text>
                                     {' '}and{' '}
-                                    <Text style={styles.linkText}>Privacy Policy</Text>
+                                    <Text style={styles.linkText} onPress={handlePrivacyPress}>
+                                        Privacy Policy
+                                    </Text>
                                 </Text>
                             </View>
                         </TouchableOpacity>
 
                         {/* Register Button */}
                         <TouchableOpacity 
-                            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]} 
+                            style={[
+                                styles.registerButton, 
+                                isLoading && styles.registerButtonDisabled,
+                                !acceptTerms && styles.registerButtonDisabled
+                            ]} 
                             onPress={handleRegister}
-                            disabled={isLoading}
+                            disabled={isLoading || !acceptTerms}
                             activeOpacity={0.8}
                         >
                             <LinearGradient
-                                colors={isLoading ? ['#95A5A6', '#7F8C8D'] : ['#27AE60', '#2ECC71']}
+                                colors={
+                                    isLoading || !acceptTerms 
+                                        ? ['#95A5A6', '#7F8C8D'] 
+                                        : ['#27AE60', '#2ECC71']
+                                }
                                 style={styles.registerButtonGradient}
                             >
                                 {isLoading ? (
-                                    <>
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="small" color="#fff" />
                                         <Text style={styles.loadingText}>Creating Account...</Text>
-                                    </>
+                                    </View>
                                 ) : (
                                     <>
                                         <Icon name="person-add-outline" size={20} color="#fff" />
@@ -450,6 +607,7 @@ export default function RegisterScreen({ navigation }: Props) {
                                 style={styles.socialButton}
                                 onPress={() => handleSocialRegister('Google')}
                                 activeOpacity={0.7}
+                                disabled={isLoading}
                             >
                                 <Icon name="logo-google" size={20} color="#DB4437" />
                                 <Text style={styles.socialButtonText}>Google</Text>
@@ -459,6 +617,7 @@ export default function RegisterScreen({ navigation }: Props) {
                                 style={styles.socialButton}
                                 onPress={() => handleSocialRegister('Apple')}
                                 activeOpacity={0.7}
+                                disabled={isLoading}
                             >
                                 <Icon name="logo-apple" size={20} color="#000" />
                                 <Text style={styles.socialButtonText}>Apple</Text>
@@ -472,13 +631,19 @@ export default function RegisterScreen({ navigation }: Props) {
                         <TouchableOpacity 
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.7}
+                            disabled={isLoading}
                         >
-                            <Text style={styles.loginLink}>Sign In</Text>
+                            <Text style={[
+                                styles.loginLink,
+                                isLoading && styles.linkDisabled
+                            ]}>
+                                Sign In
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -492,10 +657,10 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        paddingBottom: Platform.OS === 'ios' ? 50 : 100,
+        paddingBottom: Platform.OS === 'ios' ? 30 : 50,
     },
     headerGradient: {
-        paddingTop: 50,
+        paddingTop: Platform.OS === 'ios' ? 60 : 50,
         paddingBottom: 30,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
@@ -507,6 +672,7 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
         padding: 8,
         marginBottom: 10,
+        borderRadius: 20,
     },
     logoContainer: {
         flexDirection: 'row',
@@ -569,6 +735,22 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 25,
         lineHeight: 20,
+    },
+    generalErrorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF5F5',
+        borderWidth: 1,
+        borderColor: theme.colors.error,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 20,
+    },
+    generalErrorText: {
+        color: theme.colors.error,
+        fontSize: 14,
+        marginLeft: 8,
+        flex: 1,
     },
     inputContainer: {
         marginBottom: 18,
@@ -680,6 +862,10 @@ const styles = StyleSheet.create({
     linkText: {
         color: theme.colors.primary,
         fontWeight: '500',
+        textDecorationLine: 'underline',
+    },
+    linkDisabled: {
+        opacity: 0.5,
     },
     registerButton: {
         borderRadius: 16,
@@ -694,6 +880,7 @@ const styles = StyleSheet.create({
     registerButtonDisabled: {
         shadowOpacity: 0.1,
         elevation: 2,
+        opacity: 0.7,
     },
     registerButtonGradient: {
         flexDirection: 'row',
@@ -702,11 +889,17 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         paddingHorizontal: 24,
         gap: 8,
+        minHeight: 52,
     },
     registerButtonText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     loadingText: {
         fontSize: 16,
@@ -744,6 +937,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 16,
         gap: 6,
+        minHeight: 44,
     },
     socialButtonText: {
         fontSize: 13,
@@ -756,6 +950,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 20,
         marginBottom: 40,
+        paddingHorizontal: 20,
     },
     loginText: {
         fontSize: 14,
