@@ -17,6 +17,7 @@ import {
     launchImageLibrary
 } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons'; // ✅ Import icons
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +27,7 @@ const HomeScreen = () => {
 
     const options = {
         mediaType: 'photo' as const,
-        quality: 1 as const, // 1 means highest quality
+        quality: 1 as const,
     };
 
     const handleSelectFromGallery = async () => {
@@ -47,8 +48,7 @@ const HomeScreen = () => {
         if (selectedImage) {
             setIsAnalyzing(true);
             console.log('Identifying plant from:', selectedImage.uri);
-            // TODO: Add model inference logic here
-            
+
             // Simulate analysis delay
             setTimeout(() => {
                 setIsAnalyzing(false);
@@ -77,11 +77,13 @@ const HomeScreen = () => {
                             <Text style={styles.logoEmoji}>🌿</Text>
                             <Text style={styles.logoText}>MedBotanica</Text>
                         </View>
-                        <Text style={styles.subtitle}>AI-Powered Herbal Plant Identification</Text>
+                        <Text style={styles.subtitle}>
+                            AI-Powered Herbal Plant Identification
+                        </Text>
                     </View>
                 </LinearGradient>
 
-                <ScrollView 
+                <ScrollView
                     style={styles.content}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
@@ -96,11 +98,11 @@ const HomeScreen = () => {
                         <View style={styles.uploadArea}>
                             {selectedImage ? (
                                 <View style={styles.imageContainer}>
-                                    <Image 
-                                        source={{ uri: selectedImage.uri }} 
-                                        style={styles.imagePreview} 
+                                    <Image
+                                        source={{ uri: selectedImage.uri }}
+                                        style={styles.imagePreview}
                                     />
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.removeButton}
                                         onPress={resetSelection}
                                     >
@@ -109,7 +111,9 @@ const HomeScreen = () => {
                                 </View>
                             ) : (
                                 <View style={styles.placeholderContainer}>
-                                    <Text style={styles.placeholderIcon}>📸</Text>
+                                    <Text style={styles.placeholderIcon}>
+                                        <Icon name="photo-camera" size={28} color="#1B4332" />
+                                    </Text>
                                     <Text style={styles.placeholderText}>
                                         No image selected
                                     </Text>
@@ -122,21 +126,21 @@ const HomeScreen = () => {
 
                         {/* Action Buttons */}
                         <View style={styles.buttonContainer}>
-                            <TouchableOpacity 
-                                style={[styles.actionButton, styles.galleryButton]} 
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.galleryButton]}
                                 onPress={handleSelectFromGallery}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.buttonIcon}>🖼️</Text>
+                                <Icon name="photo-library" size={28} color="#1B4332" />
                                 <Text style={styles.buttonText}>Gallery</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity 
-                                style={[styles.actionButton, styles.cameraButton]} 
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.cameraButton]}
                                 onPress={handleCaptureWithCamera}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.buttonIcon}>📷</Text>
+                                <Icon name="photo-camera" size={28} color="#1B4332" />
                                 <Text style={styles.buttonText}>Camera</Text>
                             </TouchableOpacity>
                         </View>
@@ -144,19 +148,19 @@ const HomeScreen = () => {
 
                     {/* Analysis Section */}
                     <View style={styles.analysisSection}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[
-                                styles.identifyButton, 
-                                (!selectedImage || isAnalyzing) && styles.disabledButton
-                            ]} 
+                                styles.identifyButton,
+                                (!selectedImage || isAnalyzing) && styles.disabledButton,
+                            ]}
                             onPress={handleIdentifyPlant}
                             disabled={!selectedImage || isAnalyzing}
                             activeOpacity={0.9}
                         >
                             <LinearGradient
                                 colors={
-                                    (!selectedImage || isAnalyzing) 
-                                        ? ['#95A5A6', '#7F8C8D'] 
+                                    !selectedImage || isAnalyzing
+                                        ? ['#95A5A6', '#7F8C8D']
                                         : ['#27AE60', '#2ECC71']
                                 }
                                 style={styles.buttonGradient}
@@ -184,20 +188,20 @@ const HomeScreen = () => {
                     <View style={styles.featuresSection}>
                         <Text style={styles.featuresTitle}>What you'll get:</Text>
                         <View style={styles.featuresList}>
-                            <FeatureItem 
-                                icon="🏷️" 
+                            <FeatureItem
+                                icon="🏷️"
                                 text="Plant identification with scientific name"
                             />
-                            <FeatureItem 
-                                icon="💊" 
+                            <FeatureItem
+                                icon="💊"
                                 text="Medicinal properties and uses"
                             />
-                            <FeatureItem 
-                                icon="⚠️" 
+                            <FeatureItem
+                                icon="⚠️"
                                 text="Safety information and warnings"
                             />
-                            <FeatureItem 
-                                icon="📚" 
+                            <FeatureItem
+                                icon="📚"
                                 text="Historical and cultural significance"
                             />
                         </View>
@@ -354,14 +358,11 @@ const styles = StyleSheet.create({
     cameraButton: {
         borderColor: '#52B788',
     },
-    buttonIcon: {
-        fontSize: 24,
-        marginBottom: 5,
-    },
     buttonText: {
         fontSize: 16,
         fontWeight: '600',
         color: '#1B4332',
+        marginTop: 5,
     },
     analysisSection: {
         marginBottom: 30,
