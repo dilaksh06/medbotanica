@@ -21,7 +21,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import theme from '../utils/theme';
 import { API_BASE_URL } from '../config/api';
-// import AsyncStorage from '@react-native-async-storage/async-storage'; // Uncomment when using AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Uncomment when using AsyncStorage
 
 const { width, height } = Dimensions.get('window');
 
@@ -143,8 +143,8 @@ export default function LoginScreen({ navigation }: Props) {
                 // Store authentication token
                 if (responseData.data?.token) {
                     // TODO: Uncomment and use AsyncStorage to store the token
-                    // await AsyncStorage.setItem('authToken', responseData.data.token);
-                    // await AsyncStorage.setItem('userData', JSON.stringify(responseData.data.user));
+                    await AsyncStorage.setItem('authToken', responseData.data.token);
+                    await AsyncStorage.setItem('userData', JSON.stringify(responseData.data.user));
                     console.log('Token stored:', responseData.data.token);
                 }
 

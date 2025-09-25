@@ -17,7 +17,7 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
@@ -49,9 +49,8 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
     // Fetch user data from backend
     const fetchUserData = async () => {
         try {
-            // const token = await AsyncStorage.getItem('authToken');
+            const token = await AsyncStorage.getItem('authToken');
             // For demo purposes, using a placeholder
-            const token = 'demo-token';
             
             const response = await fetch(`${API_BASE_URL}/user/me`, {
                 method: 'GET',
@@ -92,8 +91,8 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
                 name: 'profile.jpg',
             });
 
-            // const token = await AsyncStorage.getItem('authToken');
-            const token = 'demo-token';
+            const token = await AsyncStorage.getItem('authToken');
+            
 
             const response = await fetch(`${API_BASE_URL}/user/avatar`, {
                 method: 'POST',
@@ -193,8 +192,8 @@ const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
                     text: 'Logout', 
                     style: 'destructive', 
                     onPress: async () => {
-                        // await AsyncStorage.removeItem('authToken');
-                        // await AsyncStorage.removeItem('userData');
+                        await AsyncStorage.removeItem('authToken');
+                        await AsyncStorage.removeItem('userData');
                         navigation.reset({
                             index: 0,
                             routes: [{ name: 'Login' }],

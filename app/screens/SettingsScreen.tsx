@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api';
 
 interface User {
     id: string;
@@ -44,10 +46,9 @@ const SettingsScreen = ({ navigation }) => {
 
     const fetchUserData = async () => {
         try {
-            // const token = await AsyncStorage.getItem('authToken');
-            const token = 'your-auth-token';
+            const token = await AsyncStorage.getItem('authToken');
             
-            const response = await fetch('http://your-api-url/user/me', {
+            const response = await fetch(`${API_BASE_URL}/user/me`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -80,10 +81,9 @@ const SettingsScreen = ({ navigation }) => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            // const token = await AsyncStorage.getItem('authToken');
-            const token = 'your-auth-token';
+            const token = await AsyncStorage.getItem('authToken');
             
-            const response = await fetch('http://your-api-url/user/me', {
+            const response = await fetch(`${API_BASE_URL}/user/me`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
